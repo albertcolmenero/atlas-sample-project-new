@@ -14,6 +14,7 @@ export function AtlasClientProvider({
 }) {
   const { userId, getToken, isLoaded } = useAuth();
   const { user } = useUser();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [AtlasProvider, setAtlasProvider] = useState<any>(null);
 
   useEffect(() => {

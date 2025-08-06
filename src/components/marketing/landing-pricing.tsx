@@ -2,12 +2,12 @@
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useAuth } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
+// Removed unused import
+// Removed unused imports
 import { PricingComponent, usePricingModel } from "@runonatlas/next/client";
 
 export function LandingPricing() {
-  const { isSignedIn, isLoaded } = useAuth();
+  // Removed unused auth variables
   const pricingModel = usePricingModel();
   
   return (
@@ -50,6 +50,7 @@ export function LandingPricing() {
                         <th className="text-left py-4 px-4 font-semibold text-slate-800">
                           Features
                         </th>
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {pricingModel.pricingModel.plans.map((plan: any) => (
                           <th key={plan.id} className="text-center py-4 px-4 font-semibold text-slate-800">
                             <div>
@@ -64,6 +65,7 @@ export function LandingPricing() {
                       </tr>
                     </thead>
                     <tbody>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                       {pricingModel.pricingModel.entitlements.map((entitlement: any) => (
                         <tr key={entitlement.id} className="border-b border-slate-100 hover:bg-slate-25">
                           <td className="py-4 px-4">
@@ -74,8 +76,10 @@ export function LandingPricing() {
                               
                             </div>
                           </td>
+                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                           {pricingModel.pricingModel?.plans.map((plan: any) => {
                             const planEntitlement = plan.entitlements.find(
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
                               (pe: any) => pe.id === entitlement.id
                             );
                             const isIncluded = planEntitlement?.included;

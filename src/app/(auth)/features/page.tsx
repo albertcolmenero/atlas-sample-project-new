@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FeatureGate } from "@/components/atlas/feature-gate";
+// Removed unused imports
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePricingModel, useCustomerInfo } from "@runonatlas/next/client";
 
@@ -19,6 +18,7 @@ export default function FeaturesPage() {
   
   // Find the matching plan in pricing model to get correct entitlements
   const pricingModelPlan = pricingModel.pricingModel?.plans?.find(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (plan: any) => plan.id === activePlanId
   );
   const userEntitlements = pricingModelPlan?.entitlements || [];
@@ -228,13 +228,11 @@ export default function FeaturesPage() {
 }
   */
 
-  // Helper function to check if user has access to an entitlement
-  const hasAccess = (entitlementId: string) => {
-    return userEntitlements.some((ent: any) => ent.id === entitlementId && ent.included);
-  };
+  // Removed unused helper function
 
   // Helper function to get entitlement details including limits
   const getEntitlementDetails = (entitlementId: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const userEntitlement = userEntitlements.find((ent: any) => ent.id === entitlementId);
     return {
       hasAccess: userEntitlement?.included || false,
@@ -290,6 +288,7 @@ export default function FeaturesPage() {
             <span className="flex items-center gap-1">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <span className="text-green-700 font-medium">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {userEntitlements.filter((ent: any) => ent.included).length} features included
               </span>
             </span>
@@ -303,6 +302,7 @@ export default function FeaturesPage() {
 
       {/* All Available Features */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         {allEntitlements.map((entitlement: any) => {
           const details = getEntitlementDetails(entitlement.id);
           

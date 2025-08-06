@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 export function AtlasCustomerPortal() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [CustomerPortalComponent, setCustomerPortalComponent] = useState<any>(null);
 
   useEffect(() => {

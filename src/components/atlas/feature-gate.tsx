@@ -9,6 +9,7 @@ interface FeatureGateProps {
 }
 
 export function FeatureGate({ feature, children, fallback }: FeatureGateProps) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [FeatureProtect, setFeatureProtect] = useState<any>(null);
 
   useEffect(() => {

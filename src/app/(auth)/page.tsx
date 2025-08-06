@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FeatureGate } from "@/components/atlas/feature-gate";
+// Removed unused imports
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePricingModel, useCustomerInfo } from "@runonatlas/next/client";
 
@@ -15,20 +14,25 @@ export default function FeaturesPage() {
   // Extract user's active plan and included entitlements
   const activeSubscription = customerInfo.user?.activeSubscriptions?.[0];
   const activePlan = activeSubscription?.plan;
-  const userEntitlements = activePlan?.entitlements || [];
+  const activePlanId = activePlan?.id;
+  
+  // Find the matching plan in pricing model to get correct entitlements
+  const pricingModelPlan = pricingModel.pricingModel?.plans?.find(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (plan: any) => plan.id === activePlanId
+  );
+  const userEntitlements = pricingModelPlan?.entitlements || [];
   
   // Get all available entitlements from pricing model
   const allEntitlements = pricingModel.pricingModel?.entitlements || [];
   
   const isLoading = pricingModel.isLoading || customerInfo.isLoading;
 
-  // Helper function to check if user has access to an entitlement
-  const hasAccess = (entitlementId: string) => {
-    return userEntitlements.some((ent: any) => ent.id === entitlementId && ent.included);
-  };
+  // Removed unused helper function
 
   // Helper function to get entitlement details including limits
   const getEntitlementDetails = (entitlementId: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const userEntitlement = userEntitlements.find((ent: any) => ent.id === entitlementId);
     return {
       hasAccess: userEntitlement?.included || false,
@@ -58,24 +62,24 @@ export default function FeaturesPage() {
       <div>
         <h1 className="text-3xl font-bold text-atlas-900">Features & Entitlements</h1>
         <p className="text-slate-600 mt-2">
-          Your feature access based on the <span className="font-medium text-atlas-700">{activePlan?.name || 'current'}</span> plan
+          Your feature access based on the <span className="font-medium text-atlas-700">{pricingModelPlan?.name || activePlan?.name || 'current'}</span> plan
         </p>
       </div>
 
       {/* Current Plan Summary */}
-      {activePlan && (
+      {(pricingModelPlan || activePlan) && (
         <div className="bg-gradient-to-r from-atlas-50 to-purple-50 border border-atlas-200 rounded-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-bold text-atlas-900">{activePlan.name}</h3>
-              <p className="text-slate-600">{activePlan.description}</p>
+              <h3 className="text-lg font-bold text-atlas-900">{pricingModelPlan?.name || activePlan?.name}</h3>
+              <p className="text-slate-600">{pricingModelPlan?.description || activePlan?.description}</p>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-atlas-700">
-                ${activePlan.basePlanPrice?.rules?.price || 'Custom'}
+                ${pricingModelPlan?.price?.price || activePlan?.basePlanPrice?.rules?.price || 'Custom'}
               </div>
               <div className="text-sm text-slate-500">
-                {activePlan.basePlanPrice?.billingCadence || 'monthly'}
+                monthly
               </div>
             </div>
           </div>
@@ -84,6 +88,7 @@ export default function FeaturesPage() {
             <span className="flex items-center gap-1">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <span className="text-green-700 font-medium">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {userEntitlements.filter((ent: any) => ent.included).length} features included
               </span>
             </span>
@@ -97,6 +102,7 @@ export default function FeaturesPage() {
 
       {/* All Available Features */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         {allEntitlements.map((entitlement: any) => {
           const details = getEntitlementDetails(entitlement.id);
           

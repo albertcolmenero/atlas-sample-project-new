@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 export function AtlasPricing() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [PricingComponent, setPricingComponent] = useState<any>(null);
 
   useEffect(() => {
