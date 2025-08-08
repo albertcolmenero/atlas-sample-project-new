@@ -14,6 +14,7 @@ export default function Page() {
         <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
           <SignIn 
             path="/sign-in"
+            fallbackRedirectUrl="/features"
             routing="path"
             signUpUrl="/sign-up"
             appearance={{
