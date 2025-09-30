@@ -204,3 +204,5 @@ This is an internal demo application. For Atlas SDK issues or feature requests, 
 ## 📄 License
 
 Internal use only - Atlas SDK demonstration purposes.
+
+//ATLAS_API_KEY=1d7d8294-8cb6-4d99-aed9-36a4f9d2d6e8

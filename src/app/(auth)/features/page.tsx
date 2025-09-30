@@ -2,7 +2,15 @@
 
 // Removed unused imports
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { usePricingModel, useCustomerInfo } from "@runonatlas/next/client";
+import { useState, useEffect } from "react";
+import {
+  loadFeatureUsage,
+  incrementFeatureUsage,
+  decrementFeatureUsage,
+  type FeatureUsageData
+} from "@/lib/feature-usage";
 
 export default function FeaturesPage() {
   const pricingModel = usePricingModel();
@@ -26,12 +34,31 @@ export default function FeaturesPage() {
   console.log("activePlan", activePlan);
   console.log("pricingModelPlan", pricingModelPlan);
   console.log("userEntitlements", userEntitlements);
-  
-  
+
   // Get all available entitlements from pricing model
   const allEntitlements = pricingModel.pricingModel?.entitlements || [];
+
+  console.log("allEntitlements", allEntitlements);
   
   const isLoading = pricingModel.isLoading || customerInfo.isLoading;
+
+  // State for testing usage-based features
+  const [testingFeature, setTestingFeature] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
+
+  // State for feature usage tracking
+  const [featureUsage, setFeatureUsage] = useState<FeatureUsageData>({});
+  const currentUserId = customerInfo.user?.id;
+
+  // Load feature usage data when user changes
+  useEffect(() => {
+    if (currentUserId) {
+      const usageData = loadFeatureUsage(currentUserId);
+      setFeatureUsage(usageData);
+    } else {
+      setFeatureUsage({});
+    }
+  }, [currentUserId]);
 
   /*
 
@@ -230,17 +257,78 @@ export default function FeaturesPage() {
 
   // Removed unused helper function
 
-  // Helper function to get entitlement details including limits
+  // Helper function to get entitlement details including limits and pricing
   const getEntitlementDetails = (entitlementId: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const userEntitlement = userEntitlements.find((ent: any) => ent.id === entitlementId);
     return {
       hasAccess: userEntitlement?.included || false,
       limit: userEntitlement?.limit || null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      price: (userEntitlement as any)?.price || null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      isUsageBased: (userEntitlement as any)?.price?.priceType && (userEntitlement as any)?.price?.priceType !== 'none',
     };
   };
 
-  
+  // Function to test usage-based features
+  const testUsageFeature = async (featureId: string) => {
+    console.log("Testing feature:", featureId);
+    setTestingFeature(featureId);
+    try {
+      const response = await fetch('/api/test-usage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ featureId }),
+      });
+
+      const data = await response.json();
+      console.log("API Response:", response.status, data);
+
+      setTestResults(prev => ({
+        ...prev,
+        [featureId]: {
+          success: response.ok,
+          message: data.error || data.message,
+        },
+      }));
+    } catch {
+      setTestResults(prev => ({
+        ...prev,
+        [featureId]: {
+          success: false,
+          message: 'Network error occurred while testing the feature',
+        },
+      }));
+    } finally {
+      setTestingFeature(null);
+    }
+  };
+
+  // Function to increment feature usage
+  const handleIncrementUsage = (featureId: string) => {
+    if (!currentUserId) return;
+
+    const newCount = incrementFeatureUsage(currentUserId, featureId);
+    setFeatureUsage(prev => ({
+      ...prev,
+      [featureId]: newCount
+    }));
+  };
+
+  // Function to decrement feature usage
+  const handleDecrementUsage = (featureId: string) => {
+    if (!currentUserId) return;
+
+    const newCount = decrementFeatureUsage(currentUserId, featureId);
+    setFeatureUsage(prev => ({
+      ...prev,
+      [featureId]: newCount
+    }));
+  };
+
 
   if (isLoading) {
     return (
@@ -276,10 +364,10 @@ export default function FeaturesPage() {
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-atlas-700">
-                ${pricingModelPlan?.price?.price || activePlan?.basePlanPrice?.rules?.price || 'Custom'}
+                ${pricingModelPlan?.prices[activeSubscription?.billingCadence || 'monthly']?.price || activePlan?.basePlanPrice?.rules?.price || 'Custom'}
               </div>
               <div className="text-sm text-slate-500">
-                monthly
+                {activeSubscription?.billingCadence}
               </div>
             </div>
           </div>
@@ -308,11 +396,11 @@ export default function FeaturesPage() {
           
 
           return (
-            <Card 
+            <Card
               key={entitlement.id}
               className={`transition-all duration-200 ${
-                details.hasAccess 
-                  ? 'border-green-200 bg-green-50 shadow-md' 
+                details.hasAccess
+                  ? 'border-green-200 bg-green-50 shadow-md'
                   : 'border-slate-200 bg-white opacity-75 hover:opacity-90'
               }`}
             >
@@ -322,7 +410,11 @@ export default function FeaturesPage() {
                     <span className="text-2xl"></span>
                     <div>
                       <CardTitle className={`text-lg ${
-                        details.hasAccess ? 'text-green-800' : 'text-slate-700'
+                        details.hasAccess
+                          ? details.isUsageBased
+                            ? 'text-orange-800'
+                            : 'text-green-800'
+                          : 'text-slate-700'
                       }`}>
                         {entitlement.name}
                       </CardTitle>
@@ -333,10 +425,14 @@ export default function FeaturesPage() {
                   </div>
                   {details.hasAccess ? (
                     <div className="flex items-center gap-1 text-green-600">
-                      <span className="text-sm font-medium">✓ Included</span>
+                      <span className="text-sm font-medium">
+                        {'✓'}
+                      </span>
                     </div>
                   ) : (
-                    <span className="text-slate-400 text-sm">🔒 Locked</span>
+                    <span className="text-slate-400 text-sm">
+                      {details.isUsageBased ? `Available: $${details.price.price}/use` : '🔒'}
+                    </span>
                   )}
                 </div>
               </CardHeader>
@@ -345,22 +441,98 @@ export default function FeaturesPage() {
                 <p className={`text-sm mb-4 ${
                   details.hasAccess ? 'text-slate-700' : 'text-slate-500'
                 }`}>
-                 
+                  {details.isUsageBased
+                    ? details.hasAccess
+                      ? 'This feature is billed per use. You will be charged based on your actual usage.'
+                      : 'This feature is available for usage-based billing. Pay only for what you use.'
+                    : details.hasAccess
+                      ? 'This feature is included in your current plan.'
+                      : 'This feature is not included in your current plan.'
+                  }
                 </p>
-                
-                {/* Show limit if it exists */}
-                {details.limit && (
-                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+
+                {/* Show pricing information for usage-based features */}
+                {details.isUsageBased && (
+                  <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
                     <div className="flex items-center gap-2">
-                      <span className="text-blue-600">📊</span>
-                      <span className="text-sm font-medium text-blue-800">
-                        Limit: {details.limit.toLocaleString()}
+                      <span className="text-orange-600">💰</span>
+                      <span className="text-sm font-medium text-orange-800">
+                        ${details.price.price} per use
                       </span>
                     </div>
                   </div>
                 )}
 
-                
+                {/* Show limit and usage tracking if it exists */}
+                {details.limit && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-blue-600">📊</span>
+                        <span className="text-sm font-medium text-blue-800">
+                          Used: {featureUsage[entitlement.id] || 0} / Limit: {details.limit.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Increment/Decrement buttons for limit-type features */}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => handleDecrementUsage(entitlement.id)}
+                        disabled={(featureUsage[entitlement.id] || 0) <= 0}
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0 !bg-white !text-red-600 !border-red-300 hover:!bg-red-50 disabled:opacity-50"
+                      >
+                        -
+                      </Button>
+                      <Button
+                        onClick={() => handleIncrementUsage(entitlement.id)}
+                        disabled={(featureUsage[entitlement.id] || 0) >= details.limit}
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0 !bg-white !text-green-600 !border-green-300 hover:!bg-green-50 disabled:opacity-50"
+                      >
+                        +
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Test button for usage-based features */}
+                {details.isUsageBased && details.hasAccess && (
+                  <div className="mt-4 space-y-3">
+                    <Button
+                      onClick={() => testUsageFeature(entitlement.slug)}
+                      disabled={testingFeature === entitlement.slug}
+                      className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                      size="sm"
+                    >
+                      {testingFeature === entitlement.slug ? 'Testing...' : 'Test Usage Event'}
+                    </Button>
+
+                    {/* Show test results */}
+                    {testResults[entitlement.slug] && (
+                      <div className={`p-3 rounded-lg border ${
+                        testResults[entitlement.slug].success
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-red-50 border-red-200'
+                      }`}>
+                        <div className="flex items-center gap-2">
+                          <span className={testResults[entitlement.slug].success ? 'text-green-600' : 'text-red-600'}>
+                            {testResults[entitlement.slug].success ? '✅' : '❌'}
+                          </span>
+                          <span className={`text-sm font-medium ${
+                            testResults[entitlement.slug].success ? 'text-green-800' : 'text-red-800'
+                          }`}>
+                            {testResults[entitlement.slug].message}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </CardContent>
             </Card>
           );
