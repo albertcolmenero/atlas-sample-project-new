@@ -3,7 +3,7 @@
 // Removed unused imports
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { usePricingModel, useCustomerInfo } from "@runonatlas/next/client";
+import { usePricingModel, useCustomerInfo, useCustomerFeatures } from "@runonatlas/next/client";
 import { useState, useEffect } from "react";
 import {
   loadFeatureUsage,
@@ -12,34 +12,48 @@ import {
   type FeatureUsageData
 } from "@/lib/feature-usage";
 
+// Define feature type based on Atlas API response
+type Feature = {
+  id: string;
+  included?: boolean;
+  allowed?: boolean;
+  type?: string;
+  limits?: { limit?: number };
+  usage?: Array<{ maxUsage?: number; current?: number }>;
+  shouldReportEvents?: boolean;
+  customPricingUnit?: { balance?: number };
+};
+
+// Define feature details type for getFeatureDetails return value
+type FeatureDetails = {
+  hasAccess: boolean;
+  allowed: boolean;
+  type: 'entitlement' | 'limit' | 'usageBased' | 'creditBased';
+  limit: number | null;
+  currentUsage: number;
+  shouldReportEvents: boolean;
+  currentBalance: number;
+};
+
 export default function FeaturesPage() {
   const pricingModel = usePricingModel();
   const customerInfo = useCustomerInfo();
+  const { features } = useCustomerFeatures();
 
   console.log("pricingModel", pricingModel);
   console.log("customerInfo", customerInfo);
-  
+  console.log("features", features);
+
   // Extract user's active plan and included entitlements
   const activeSubscription = customerInfo.user?.activeSubscriptions?.[0];
   const activePlan = activeSubscription?.plan;
   const activePlanId = activePlan?.id;
-  
-  // Find the matching plan in pricing model to get correct entitlements
+
+  // Find the matching plan in pricing model to get correct plan details for summary
   const pricingModelPlan = pricingModel.pricingModel?.plans?.find(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (plan: any) => plan.id === activePlanId
+    (plan) => plan.id === activePlanId
   );
-  const userEntitlements = pricingModelPlan?.entitlements || [];
 
-  console.log("activePlan", activePlan);
-  console.log("pricingModelPlan", pricingModelPlan);
-  console.log("userEntitlements", userEntitlements);
-
-  // Get all available entitlements from pricing model
-  const allEntitlements = pricingModel.pricingModel?.entitlements || [];
-
-  console.log("allEntitlements", allEntitlements);
-  
   const isLoading = pricingModel.isLoading || customerInfo.isLoading;
 
   // State for testing usage-based features
@@ -47,6 +61,7 @@ export default function FeaturesPage() {
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
 
   // State for feature usage tracking
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [featureUsage, setFeatureUsage] = useState<FeatureUsageData>({});
   const currentUserId = customerInfo.user?.id;
 
@@ -255,19 +270,17 @@ export default function FeaturesPage() {
 }
   */
 
-  // Removed unused helper function
-
-  // Helper function to get entitlement details including limits and pricing
-  const getEntitlementDetails = (entitlementId: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const userEntitlement = userEntitlements.find((ent: any) => ent.id === entitlementId);
+  // Helper function to get feature details
+  const getFeatureDetails = (featureId: string): FeatureDetails => {
+    const feature = features.find((f: Feature) => f.id === featureId);
     return {
-      hasAccess: userEntitlement?.included || false,
-      limit: userEntitlement?.limit || null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      price: (userEntitlement as any)?.price || null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      isUsageBased: (userEntitlement as any)?.price?.priceType && (userEntitlement as any)?.price?.priceType !== 'none',
+      hasAccess: feature?.included || false,
+      allowed: feature?.allowed || false,
+      type: (feature?.type as FeatureDetails['type']) || 'entitlement',
+      limit: feature?.limits?.limit || feature?.usage?.[0]?.maxUsage || null,
+      currentUsage: feature?.usage?.[0]?.current || 0,
+      shouldReportEvents: feature?.shouldReportEvents || false,
+      currentBalance: feature?.customPricingUnit?.balance || 0,
     };
   };
 
@@ -376,8 +389,7 @@ export default function FeaturesPage() {
             <span className="flex items-center gap-1">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <span className="text-green-700 font-medium">
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                {userEntitlements.filter((ent: any) => ent.included).length} features included
+                {features.filter((f: Feature) => f.included).length} features included
               </span>
             </span>
             <span className="text-slate-400">•</span>
@@ -390,14 +402,12 @@ export default function FeaturesPage() {
 
       {/* All Available Features */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        {allEntitlements.map((entitlement: any) => {
-          const details = getEntitlementDetails(entitlement.id);
-          
+        {features.map((feature: Feature) => {
+          const details = getFeatureDetails(feature.id);
 
           return (
             <Card
-              key={entitlement.id}
+              key={feature.id}
               className={`transition-all duration-200 ${
                 details.hasAccess
                   ? 'border-green-200 bg-green-50 shadow-md'
@@ -411,15 +421,15 @@ export default function FeaturesPage() {
                     <div>
                       <CardTitle className={`text-lg ${
                         details.hasAccess
-                          ? details.isUsageBased
+                          ? details.type === 'usageBased'
                             ? 'text-orange-800'
                             : 'text-green-800'
                           : 'text-slate-700'
                       }`}>
-                        {entitlement.name}
+                        {feature.id}
                       </CardTitle>
                       <CardDescription className="text-sm">
-                        {entitlement.slug}
+                        Type: {details.type}
                       </CardDescription>
                     </div>
                   </div>
@@ -431,101 +441,127 @@ export default function FeaturesPage() {
                     </div>
                   ) : (
                     <span className="text-slate-400 text-sm">
-                      {details.isUsageBased ? `Available: $${details.price.price}/use` : '🔒'}
+                      {details.allowed ? 'Available' : '🔒'}
                     </span>
                   )}
                 </div>
               </CardHeader>
-              
+
               <CardContent>
                 <p className={`text-sm mb-4 ${
                   details.hasAccess ? 'text-slate-700' : 'text-slate-500'
                 }`}>
-                  {details.isUsageBased
+                  {details.type === 'usageBased'
                     ? details.hasAccess
                       ? 'This feature is billed per use. You will be charged based on your actual usage.'
-                      : 'This feature is available for usage-based billing. Pay only for what you use.'
-                    : details.hasAccess
-                      ? 'This feature is included in your current plan.'
                       : 'This feature is not included in your current plan.'
+                    : details.type === 'creditBased'
+                      ? details.hasAccess
+                        ? 'This feature is billed per credit. You will be charged based on your actual usage.'
+                        : 'This feature is not included in your current plan. '
+                    : details.type === 'limit'
+                      ? details.hasAccess
+                        ? 'This feature has usage limits included in your current plan.'
+                        : 'This feature has usage limits but is not included in your current plan.'
+                      : details.hasAccess
+                        ? 'This feature is included in your current plan.'
+                        : 'This feature is not included in your current plan.'
                   }
                 </p>
 
-                {/* Show pricing information for usage-based features */}
-                {details.isUsageBased && (
-                  <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="text-orange-600">💰</span>
-                      <span className="text-sm font-medium text-orange-800">
-                        ${details.price.price} per use
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Show limit and usage tracking if it exists */}
-                {details.limit && (
+                {/* Show usage tracking for limit and usageBased features */}
+                {(details.type === 'limit' || details.type === 'usageBased') && details.limit && (
                   <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-blue-600">📊</span>
                         <span className="text-sm font-medium text-blue-800">
-                          Used: {featureUsage[entitlement.id] || 0} / Limit: {details.limit.toLocaleString()}
+                          Used: {details.currentUsage} / Limit: {details.limit.toLocaleString()}
                         </span>
                       </div>
                     </div>
 
                     {/* Increment/Decrement buttons for limit-type features */}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        onClick={() => handleDecrementUsage(entitlement.id)}
-                        disabled={(featureUsage[entitlement.id] || 0) <= 0}
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0 !bg-white !text-red-600 !border-red-300 hover:!bg-red-50 disabled:opacity-50"
-                      >
-                        -
-                      </Button>
-                      <Button
-                        onClick={() => handleIncrementUsage(entitlement.id)}
-                        disabled={(featureUsage[entitlement.id] || 0) >= details.limit}
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0 !bg-white !text-green-600 !border-green-300 hover:!bg-green-50 disabled:opacity-50"
-                      >
-                        +
-                      </Button>
-                    </div>
+                    {details.type === 'limit' && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => handleDecrementUsage(feature.id)}
+                          disabled={details.currentUsage <= 0}
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0 !bg-white !text-red-600 !border-red-300 hover:!bg-red-50 disabled:opacity-50"
+                        >
+                          -
+                        </Button>
+                        <Button
+                          onClick={() => handleIncrementUsage(feature.id)}
+                          disabled={details.currentUsage >= details.limit}
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0 !bg-white !text-green-600 !border-green-300 hover:!bg-green-50 disabled:opacity-50"
+                        >
+                          +
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Test button for usage-based features */}
-                {details.isUsageBased && details.hasAccess && (
+                {(details.type === 'usageBased' || details.type === 'creditBased') && details.hasAccess && details.shouldReportEvents && (
                   <div className="mt-4 space-y-3">
+                    {/* Show current usage and limit */}
+                    {details.type === 'usageBased' && (
+                    <div>
+                    <div className="text-sm text-slate-600 mb-2">
+                      <span className="font-medium">Current usage:</span>{' '}
+                      {details.currentUsage}
+                      {details.limit ? ` / ${details.limit.toLocaleString()}` : ''}
+                    </div>
+
                     <Button
-                      onClick={() => testUsageFeature(entitlement.slug)}
-                      disabled={testingFeature === entitlement.slug}
+                      onClick={() => testUsageFeature(feature.id)}
+                      disabled={testingFeature === feature.id}
                       className="w-full bg-orange-600 hover:bg-orange-700 text-white"
                       size="sm"
                     >
-                      {testingFeature === entitlement.slug ? 'Testing...' : 'Test Usage Event'}
+                      {testingFeature === feature.id ? 'Testing...' : 'Test Usage Event'}
                     </Button>
+                    </div>
+                    )}
+                    {details.type === 'creditBased' && (
+                    <div>
+                    <div className="text-sm text-slate-600 mb-2">
+                      <span className="font-medium">Current balance:</span>{' '}
+                      {details.currentBalance}
+                    </div>
+
+                    <Button
+                      onClick={() => testUsageFeature(feature.id)}
+                      disabled={testingFeature === feature.id}
+                      className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                      size="sm"
+                    >
+                      {testingFeature === feature.id ? 'Testing...' : 'Test Credit Event'}
+                    </Button>
+                    </div>
+                    )}
 
                     {/* Show test results */}
-                    {testResults[entitlement.slug] && (
+                    {testResults[feature.id] && (
                       <div className={`p-3 rounded-lg border ${
-                        testResults[entitlement.slug].success
+                        testResults[feature.id].success
                           ? 'bg-green-50 border-green-200'
                           : 'bg-red-50 border-red-200'
                       }`}>
                         <div className="flex items-center gap-2">
-                          <span className={testResults[entitlement.slug].success ? 'text-green-600' : 'text-red-600'}>
-                            {testResults[entitlement.slug].success ? '✅' : '❌'}
+                          <span className={testResults[feature.id].success ? 'text-green-600' : 'text-red-600'}>
+                            {testResults[feature.id].success ? '✅' : '❌'}
                           </span>
                           <span className={`text-sm font-medium ${
-                            testResults[entitlement.slug].success ? 'text-green-800' : 'text-red-800'
+                            testResults[feature.id].success ? 'text-green-800' : 'text-red-800'
                           }`}>
-                            {testResults[entitlement.slug].message}
+                            {testResults[feature.id].message}
                           </span>
                         </div>
                       </div>
@@ -540,7 +576,7 @@ export default function FeaturesPage() {
       </div>
 
       {/* No features message */}
-      {allEntitlements.length === 0 && (
+      {features.length === 0 && (
         <div className="text-center py-12">
           <div className="text-4xl mb-4">🔧</div>
           <h3 className="text-lg font-medium text-slate-700 mb-2">No Features Configured</h3>
