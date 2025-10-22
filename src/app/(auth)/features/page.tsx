@@ -33,6 +33,11 @@ type FeatureDetails = {
   currentUsage: number;
   shouldReportEvents: boolean;
   currentBalance: number;
+  allocatedAmount: number | null;
+  featureName: string;
+  featureId: string;
+  price: number | null;
+  currentPlanId: string | null;
 };
 
 export default function FeaturesPage() {
@@ -271,16 +276,68 @@ export default function FeaturesPage() {
   */
 
   // Helper function to get feature details
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getFeatureDetails = (featureId: string): FeatureDetails => {
     const feature = features.find((f: Feature) => f.id === featureId);
+
+    // Get current subscription plan ID
+    const currentPlanId = customerInfo.user?.activeSubscriptions?.[0]?.plan?.id;
+    const customPricingUnitId = feature?.customPricingUnit?.customPricingUnitId
+
+    //console.log("feature", feature);
+    //console.log("currentPlanId", currentPlanId);
+    //console.log("customPricingUnitId", customPricingUnitId);
+
+    // Get allocated amount from pricing model for custom pricing units
+    let allocatedAmount: number | null = null;
+    let price: number | null = null;
+    if (currentPlanId && pricingModel.pricingModel?.plans) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const currentPlan = pricingModel.pricingModel.plans.find((plan: unknown) => (plan as any).id === currentPlanId);
+      //console.log("currentPlan", currentPlan);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allocation = (currentPlan as any)?.allocations?.find((alloc: unknown) => (alloc as any).customPricingUnitId === customPricingUnitId);
+      if (allocation) {
+        //console.log("allocation", allocation.amount);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        allocatedAmount = (allocation as any).amount || null;
+        //console.log("allocatedAmount", allocatedAmount);
+
+      }
+
+     // console.log("currentPlan?.entitlements?", currentPlan?.entitlements);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const entilement = (currentPlan as any)?.entitlements?.find((ent: unknown) => (ent as any).id === feature?.internalId) || null;
+      //console.log("entilement", entilement);
+      if (entilement) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const priceaux = (entilement as any).price || null;
+        //console.log("priceaux", priceaux)
+        if (priceaux) {
+          price = priceaux.price || null;
+          //console.log("price", price);
+        }
+      }
+    }
+
+    // Get entitlement name from pricing model
+    const entitlementName = pricingModel.pricingModel?.entitlements?.find(
+      entitlement => entitlement.slug === featureId
+    )?.name || featureId;
+
     return {
       hasAccess: feature?.included || false,
       allowed: feature?.allowed || false,
+      featureId: featureId,
+      featureName: entitlementName,
       type: (feature?.type as FeatureDetails['type']) || 'entitlement',
       limit: feature?.limits?.limit || feature?.usage?.[0]?.maxUsage || null,
       currentUsage: feature?.usage?.[0]?.current || 0,
       shouldReportEvents: feature?.shouldReportEvents || false,
       currentBalance: feature?.customPricingUnit?.balance || 0,
+      allocatedAmount,
+      price,
+      currentPlanId: currentPlanId || null,
     };
   };
 
@@ -410,7 +467,7 @@ export default function FeaturesPage() {
               key={feature.id}
               className={`transition-all duration-200 ${
                 details.hasAccess
-                  ? 'border-green-200 bg-green-50 shadow-md'
+                  ? 'border-green-200 bg-white shadow-md'
                   : 'border-slate-200 bg-white opacity-75 hover:opacity-90'
               }`}
             >
@@ -426,10 +483,18 @@ export default function FeaturesPage() {
                             : 'text-green-800'
                           : 'text-slate-700'
                       }`}>
-                        {feature.id}
+                        {details.featureName}
                       </CardTitle>
                       <CardDescription className="text-sm">
-                        Type: {details.type}
+                        <b>ID:</b> {details.featureId}
+                        <br></br>
+                        <b>Type:</b> {details.type}
+                        <br></br>
+                        {details.price && (
+                          <span className="ml-2 text-slate-500">
+                            • ${details.price}/{details.type === 'creditBased' ? 'credit' : 'unit'}
+                          </span>
+                        )}
                       </CardDescription>
                     </div>
                   </div>
@@ -468,6 +533,9 @@ export default function FeaturesPage() {
                         : 'This feature is not included in your current plan.'
                   }
                 </p>
+                <div className="mt-3 p-2 bg-slate-100 border border-slate-300 rounded text-xs font-mono text-slate-700 overflow-x-auto">
+                  <pre className="whitespace-pre-wrap break-all">{JSON.stringify(details, null, 2)}</pre>
+                </div>
 
                 {/* Show usage tracking for limit and usageBased features */}
                 {(details.type === 'limit' || details.type === 'usageBased') && details.limit && (
@@ -508,7 +576,7 @@ export default function FeaturesPage() {
                 )}
 
                 {/* Test button for usage-based features */}
-                {(details.type === 'usageBased' || details.type === 'creditBased') && details.hasAccess && details.shouldReportEvents && (
+                {(details.type === 'usageBased' || details.type === 'creditBased') && details.hasAccess && (
                   <div className="mt-4 space-y-3">
                     {/* Show current usage and limit */}
                     {details.type === 'usageBased' && (
@@ -531,9 +599,12 @@ export default function FeaturesPage() {
                     )}
                     {details.type === 'creditBased' && (
                     <div>
-                    <div className="text-sm text-slate-600 mb-2">
-                      <span className="font-medium">Current balance:</span>{' '}
-                      {details.currentBalance}
+                    
+
+                    {/* Nice Credit Balance Component */}
+                    <div className="flex items-center justify-between bg-gradient-to-r from-atlas-50 to-purple-50 border border-atlas-200 rounded-4xl border-gray-300 px-3 py-2 mb-4">
+                      <span className="text-sm font-normal text-grey-600 ">{details.featureName}</span>
+                      <span className="text-sm font-semibold text-grey-900">{details.currentBalance.toLocaleString()} / {details.allocatedAmount?.toLocaleString() || '∞'}</span>
                     </div>
 
                     <Button
