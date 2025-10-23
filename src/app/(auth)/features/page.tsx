@@ -42,8 +42,10 @@ type FeatureDetails = {
 
 export default function FeaturesPage() {
   const pricingModel = usePricingModel();
-  const customerInfo = useCustomerInfo();
-  const { features } = useCustomerFeatures();
+  const customerInfo  = useCustomerInfo();
+  const { features } = useCustomerFeatures( { queryOptions: { refetchInterval: 2000, staleTime: 2000}} );
+  //const {creditUsage, refetch} = useCreditUsage();
+
 
   console.log("pricingModel", pricingModel);
   console.log("customerInfo", customerInfo);
@@ -68,6 +70,23 @@ export default function FeaturesPage() {
   // State for feature usage tracking
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [featureUsage, setFeatureUsage] = useState<FeatureUsageData>({});
+
+  // State for collapsible debug details
+  const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
+
+  // Function to toggle debug details expansion
+  const toggleFeatureExpansion = (featureId: string) => {
+    setExpandedFeatures(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(featureId)) {
+        newSet.delete(featureId);
+      } else {
+        newSet.add(featureId);
+      }
+      return newSet;
+    });
+  };
+
   const currentUserId = customerInfo.user?.id;
 
   // Load feature usage data when user changes
@@ -533,8 +552,25 @@ export default function FeaturesPage() {
                         : 'This feature is not included in your current plan.'
                   }
                 </p>
-                <div className="mt-3 p-2 bg-slate-100 border border-slate-300 rounded text-xs font-mono text-slate-700 overflow-x-auto">
-                  <pre className="whitespace-pre-wrap break-all">{JSON.stringify(details, null, 2)}</pre>
+                {/* Collapsible Debug Details */}
+                <div className="mt-3">
+                  <Button
+                    onClick={() => toggleFeatureExpansion(feature.id)}
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs bg-slate-50 border-slate-300 hover:bg-slate-100"
+                  >
+                    <span className="mr-2">
+                      {expandedFeatures.has(feature.id) ? '🔽' : '▶️'}
+                    </span>
+                    {expandedFeatures.has(feature.id) ? 'Hide' : 'Show'} Debug Details
+                  </Button>
+
+                  {expandedFeatures.has(feature.id) && (
+                    <div className="mt-2 p-3 bg-slate-100 border border-slate-300 rounded text-xs font-mono text-slate-700 overflow-x-auto max-h-60 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap break-all">{JSON.stringify(details, null, 2)}</pre>
+                    </div>
+                  )}
                 </div>
 
                 {/* Show usage tracking for limit and usageBased features */}
