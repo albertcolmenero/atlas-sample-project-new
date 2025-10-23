@@ -497,23 +497,23 @@ export default function FeaturesPage() {
                     <div>
                       <CardTitle className={`text-lg ${
                         details.hasAccess
-                          ? details.type === 'usageBased'
-                            ? 'text-orange-800'
-                            : 'text-green-800'
+                          ? 'text-green-800'
                           : 'text-slate-700'
                       }`}>
                         {details.featureName}
                       </CardTitle>
-                      <CardDescription className="text-sm">
+                        <CardDescription className="text-sm">
                         <b>ID:</b> {details.featureId}
                         <br></br>
                         <b>Type:</b> {details.type}
                         <br></br>
-                        {details.price && (
-                          <span className="ml-2 text-slate-500">
-                            • ${details.price}/{details.type === 'creditBased' ? 'credit' : 'unit'}
-                          </span>
-                        )}
+                          {details.price && (
+                            <span className="ml-2 text-slate-500">
+                              • {details.type === 'creditBased'
+                                ? `${details.price} per action`
+                                : `$${details.price} per action`}
+                            </span>
+                          )}
                       </CardDescription>
                     </div>
                   </div>
